@@ -1,52 +1,113 @@
-import React, { useEffect } from "react"
-import rigoImageUrl from "../assets/img/rigo-baby.jpg";
-import useGlobalReducer from "../hooks/useGlobalReducer.jsx";
+import TopTabs from "../components/TopTabs";
+import BottomNav from "../components/BottomNav";
+import {
+  Search,
+  Clock,
+  Info,
+  ArrowRight,
+  CalendarDays,
+  Home as HomeIcon
+} from "lucide-react";
 
-export const Home = () => {
+const shops = [
+  { name: "Elegance Barbershop", address: "428 West St Astoria, NY" },
+  { name: "The Gentleman's Parlor", address: "833 38th Ave Astoria, NY" }
+];
 
-	const { store, dispatch } = useGlobalReducer()
+const suggestions = [
+  { title: "Tendencias", badge: null },
+  { title: "Cortes", badge: null },
+  { title: "Afeitado", badge: "Oferta" },
+  { title: "Cuidados", badge: "20%" }
+];
 
-	const loadMessage = async () => {
-		try {
-			const backendUrl = import.meta.env.VITE_BACKEND_URL
+export default function Home() {
+  return (
+    <div className="bo-app">
+      <div className="bo-shell">
+        <header className="bo-header">
+          <TopTabs />
+        </header>
 
-			if (!backendUrl) throw new Error("VITE_BACKEND_URL is not defined in .env file")
+        <main className="bo-main">
+          <div className="bo-searchRow">
+            <div className="bo-search">
+              <Search size={18} />
+              <input placeholder="¿Qué deseas?" />
+            </div>
 
-			const response = await fetch(backendUrl + "/api/hello")
-			const data = await response.json()
+            <button className="bo-chipBtn">
+              <CalendarDays size={18} />
+              <span>Más tarde</span>
+            </button>
+          </div>
 
-			if (response.ok) dispatch({ type: "set_hello", payload: data.message })
+          <section className="bo-list">
+            {shops.map((s) => (
+              <article className="bo-card bo-cardRow" key={s.name}>
+                <div className="bo-cardLeft">
+                  <div className="bo-roundIcon">
+                    <Clock size={18} />
+                  </div>
+                  <div>
+                    <div className="bo-cardTitle">{s.name}</div>
+                    <div className="bo-cardSub">{s.address}</div>
+                  </div>
+                </div>
 
-			return data
+                <button className="bo-iconBtn" aria-label="Más info">
+                  <Info size={18} />
+                </button>
+              </article>
+            ))}
+          </section>
 
-		} catch (error) {
-			if (error.message) throw new Error(
-				`Could not fetch the message from the backend.
-				Please check if the backend is running and the backend port is public.`
-			);
-		}
+          <div className="bo-sectionHead">
+            <h3>Sugerencias</h3>
+            <button className="bo-roundBtn" aria-label="Ver más sugerencias">
+              <ArrowRight size={18} />
+            </button>
+          </div>
 
-	}
+          <section className="bo-hscroll">
+            {suggestions.map((c) => (
+              <div className="bo-miniCard" key={c.title}>
+                <div className="bo-miniTop">
+                  <div className="bo-miniGlyph" />
+                  {c.badge ? <span className="bo-badge">{c.badge}</span> : null}
+                </div>
+                <div className="bo-miniTitle">{c.title}</div>
+              </div>
+            ))}
+          </section>
 
-	useEffect(() => {
-		loadMessage()
-	}, [])
+          <div className="bo-sectionHead">
+            <h3>Inspírate con los mejores</h3>
+          </div>
 
-	return (
-		<div className="text-center mt-5">
-			<h1 className="display-4">Hello Rigo!!</h1>
-			<p className="lead">
-				<img src={rigoImageUrl} className="img-fluid rounded-circle mb-3" alt="Rigo Baby" />
-			</p>
-			<div className="alert alert-info">
-				{store.message ? (
-					<span>{store.message}</span>
-				) : (
-					<span className="text-danger">
-						Loading message from the backend (make sure your python 🐍 backend is running)...
-					</span>
-				)}
-			</div>
-		</div>
-	);
-}; 
+          <section className="bo-grid2">
+            <div className="bo-imageCard">
+              <div className="bo-imagePh" />
+              <div className="bo-imageLabel">Barberos expertos</div>
+            </div>
+
+            <div className="bo-imageCard">
+              <div className="bo-imagePh" />
+              <div className="bo-imageLabel">Últimos estilos</div>
+            </div>
+          </section>
+
+          <button className="bo-fab">
+            <span className="bo-fabIcon">
+              <HomeIcon size={18} />
+            </span>
+            <span>A domicilio</span>
+          </button>
+        </main>
+
+        {/* Ahora navega por rutas */}
+        <BottomNav />
+      </div>
+    </div>
+  );
+}
