@@ -123,8 +123,6 @@ export default function Inbox() {
             </div>
           </section>
         </main>
-
-        <BottomNav />
       </div>
     </div>
   );

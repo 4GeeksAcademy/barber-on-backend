@@ -80,8 +80,6 @@ export default function Activity() {
             </div>
           </section>
         </main>
-
-        <BottomNav />
       </div>
     </div>
   );

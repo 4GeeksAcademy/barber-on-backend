@@ -1,27 +1,30 @@
-import { Scissors, SprayCan, Star, CalendarDays } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import { Store, Package, Star, CalendarDays } from "lucide-react";
 
 export default function TopTabs() {
+  const cls = ({ isActive }) => `bo-topItem ${isActive ? "bo-topActive" : ""}`;
+
   return (
     <div className="bo-topTabs">
-      <button className="bo-topItem bo-topActive">
-        <Scissors size={18} />
+      <NavLink to="/home" className={cls}>
+        <Store size={16} />
         <span>Barberías</span>
-      </button>
+      </NavLink>
 
-      <button className="bo-topItem">
-        <SprayCan size={18} />
+      <NavLink to="/products" className={cls}>
+        <Package size={16} />
         <span>Productos</span>
-      </button>
+      </NavLink>
 
-      <button className="bo-topItem">
-        <Star size={18} />
+      <NavLink to="/tips" className={cls}>
+        <Star size={16} />
         <span>Consejos</span>
-      </button>
+      </NavLink>
 
-      <button className="bo-topItem">
-        <CalendarDays size={18} />
+      <NavLink to="/appointments" className={cls}>
+        <CalendarDays size={16} />
         <span>Citas</span>
-      </button>
+      </NavLink>
     </div>
   );
 }
