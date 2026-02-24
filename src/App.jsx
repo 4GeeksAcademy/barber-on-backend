@@ -1,14 +1,6 @@
-import Home from "./pages/Home";
+import AppRoutes from "./front/routes.jsx";
 import "./styles/barberon.css";
 
 export default function App() {
-  return <Home />;
+  return <AppRoutes />;
 }
-<Route 
-  path="/profile" 
-  element={
-    <PrivateRoute>
-      <Profile />
-    </PrivateRoute>
-  } 
-/>

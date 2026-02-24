@@ -1,9 +1,17 @@
+import { useNavigate } from "react-router-dom";
 import TopTabs from "../components/TopTabs";
-import { Search, Clock, Info, ArrowRight, CalendarDays, Home as HomeIcon } from "lucide-react";
+import {
+  Search,
+  Clock,
+  Info,
+  ArrowRight,
+  CalendarDays,
+  Home as HomeIcon
+} from "lucide-react";
 
 const shops = [
-  { name: "Elegance Barbershop", address: "428 West St Astoria, NY" },
-  { name: "The Gentleman's Parlor", address: "833 38th Ave Astoria, NY" }
+  { id: 1, name: "Elegance Barbershop", address: "428 West St Astoria, NY" },
+  { id: 2, name: "The Gentleman's Parlor", address: "833 38th Ave Astoria, NY" }
 ];
 
 const suggestions = [
@@ -14,13 +22,14 @@ const suggestions = [
 ];
 
 export default function Home() {
+  const navigate = useNavigate();
+
   return (
     <>
       <header className="bo-header">
         <TopTabs />
       </header>
 
-      {/* OJO: este main ya existe en Layout (bo-main). Acá solo va el contenido */}
       <div className="bo-searchRow">
         <div className="bo-search">
           <Search size={18} />
@@ -33,10 +42,20 @@ export default function Home() {
         </button>
       </div>
 
+      {/* ========================= */}
+      {/* LISTA DE BARBERÍAS */}
+      {/* ========================= */}
       <section className="bo-list">
         {shops.map((s) => (
-          <article className="bo-card bo-cardRow" key={s.name}>
-            <div className="bo-cardLeft">
+          <article
+            className="bo-card bo-cardRow"
+            key={s.id}
+            style={{ cursor: "pointer" }}
+          >
+            <div
+              className="bo-cardLeft"
+              onClick={() => navigate(`/barbers/${s.id}`)}
+            >
               <div className="bo-roundIcon">
                 <Clock size={18} />
               </div>
@@ -46,16 +65,38 @@ export default function Home() {
               </div>
             </div>
 
-            <button className="bo-iconBtn" aria-label="Más info">
-              <Info size={18} />
-            </button>
+            {/* BOTONES LADO DERECHO */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                className="bo-chipBtn"
+                onClick={() => navigate(`/barbers/${s.id}`)}
+                style={{
+                  padding: "6px 10px",
+                  fontSize: 12
+                }}
+              >
+                <CalendarDays size={14} />
+                <span>Reservar</span>
+              </button>
+
+              <button
+                className="bo-iconBtn"
+                aria-label="Más info"
+                onClick={() => navigate(`/barbers/${s.id}`)}
+              >
+                <Info size={18} />
+              </button>
+            </div>
           </article>
         ))}
       </section>
 
+      {/* ========================= */}
+      {/* SUGERENCIAS */}
+      {/* ========================= */}
       <div className="bo-sectionHead">
         <h3>Sugerencias</h3>
-        <button className="bo-roundBtn" aria-label="Ver más sugerencias">
+        <button className="bo-roundBtn">
           <ArrowRight size={18} />
         </button>
       </div>
@@ -65,13 +106,16 @@ export default function Home() {
           <div className="bo-miniCard" key={c.title}>
             <div className="bo-miniTop">
               <div className="bo-miniGlyph" />
-              {c.badge ? <span className="bo-badge">{c.badge}</span> : null}
+              {c.badge && <span className="bo-badge">{c.badge}</span>}
             </div>
             <div className="bo-miniTitle">{c.title}</div>
           </div>
         ))}
       </section>
 
+      {/* ========================= */}
+      {/* INSPIRACIÓN */}
+      {/* ========================= */}
       <div className="bo-sectionHead">
         <h3>Inspírate con los mejores</h3>
       </div>
@@ -88,6 +132,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* BOTÓN FLOTANTE */}
       <button className="bo-fab" type="button">
         <span className="bo-fabIcon">
           <HomeIcon size={18} />
