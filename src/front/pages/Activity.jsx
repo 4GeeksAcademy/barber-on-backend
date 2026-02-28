@@ -1,18 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
-import { MapPin, ClipboardList, Timer, CheckCircle2, Send } from "lucide-react";
+import { MapPin, ClipboardList, Timer, CheckCircle2, Send, XCircle } from "lucide-react";
+import { getMyBookings, cancelBooking } from "../../services/api";
 
 const BASE_PRICE = 40;
 const COMMISSION_RATE = 0.05;
 
-function formatDateTime(dt) {
-  // dt: Date
-  return dt.toLocaleString([], {
-    weekday: "short",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function isSameLocalDay(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function whenLabelFromISO(isoString) {
+  const dt = new Date(isoString); // ISO Z -> Date en local
+  const now = new Date();
+  const time = dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+
+  if (isSameLocalDay(dt, now)) return `Today, ${time}`;
+  if (isSameLocalDay(dt, tomorrow)) return `Tomorrow, ${time}`;
+
+  const date = dt.toLocaleDateString([], { weekday: "short", month: "short", day: "2-digit" });
+  return `${date}, ${time}`;
 }
 
 function minutesUntil(date) {
@@ -22,6 +35,7 @@ function minutesUntil(date) {
 
 export default function Activity() {
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [bookings, setBookings] = useState([]);
 
@@ -38,18 +52,7 @@ export default function Activity() {
         return;
       }
 
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/bookings/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.msg || "Error cargando bookings");
-      }
-
+      const data = await getMyBookings(token);
       setBookings(data?.results || []);
     } catch (e) {
       setError(e.message || "Error");
@@ -60,18 +63,16 @@ export default function Activity() {
 
   useEffect(() => {
     fetchBookings();
-    const id = setInterval(fetchBookings, 10000); // "real time" básico (polling)
+    const id = setInterval(fetchBookings, 10000);
     return () => clearInterval(id);
   }, []);
 
-  // elegimos la booking activa más reciente
   const activeBooking = useMemo(() => {
     const list = [...bookings];
     list.sort((a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at));
     return list.find((b) => b.status === "pending" || b.status === "accepted") || null;
   }, [bookings]);
 
-  // countdown que se actualiza cada segundo
   const [nowTick, setNowTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setNowTick((t) => t + 1), 1000);
@@ -84,23 +85,42 @@ export default function Activity() {
     return minutesUntil(scheduled);
   }, [activeBooking, nowTick]);
 
+  async function onCancelActive() {
+    if (!activeBooking) return;
+    const ok = confirm("Cancel this booking request?");
+    if (!ok) return;
+
+    try {
+      setBusy(true);
+      setError("");
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("You are not logged in");
+
+      await cancelBooking(activeBooking.id, token);
+      await fetchBookings();
+    } catch (e) {
+      setError(e.message || "Error canceling booking");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="bo-app">
       <div className="bo-shell">
         <main className="bo-main bo-activity">
           <header className="bo-activityHeader">
-            <h1 className="bo-activityTitle">Actividad</h1>
+            <h1 className="bo-activityTitle">Activity</h1>
           </header>
 
-          {/* Próximo */}
           <section className="bo-block">
-            <h2 className="bo-h2">Próximo</h2>
+            <h2 className="bo-h2">Next</h2>
 
             {loading ? (
               <div className="bo-nextCard">
                 <div className="bo-nextText">
-                  <div className="bo-nextTitle">Cargando…</div>
-                  <div className="bo-nextSub">Buscando tus citas</div>
+                  <div className="bo-nextTitle">Loading…</div>
+                  <div className="bo-nextSub">Fetching your bookings</div>
                 </div>
                 <div className="bo-nextIconWrap" aria-hidden="true">
                   <ClipboardList size={26} />
@@ -117,13 +137,11 @@ export default function Activity() {
               <div className="bo-nextCard" style={{ gap: 14 }}>
                 <div className="bo-nextText" style={{ flex: 1 }}>
                   <div className="bo-nextTitle">
-                    {activeBooking.status === "pending" ? "Cita pendiente" : "Cita aceptada"}
+                    {activeBooking.status === "pending" ? "Booking request" : "Accepted booking"}
                   </div>
 
                   <div className="bo-nextSub" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                    <span style={{ opacity: 0.9 }}>
-                      {formatDateTime(new Date(activeBooking.scheduled_at))}
-                    </span>
+                    <span style={{ opacity: 0.9 }}>{whenLabelFromISO(activeBooking.scheduled_at)}</span>
 
                     <span style={{ display: "inline-flex", gap: 6, alignItems: "center", opacity: 0.9 }}>
                       <Timer size={16} />
@@ -131,9 +149,9 @@ export default function Activity() {
                     </span>
                   </div>
 
-                  <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+                  <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
                     <div style={{ opacity: 0.9 }}>
-                      Precio: <b>${BASE_PRICE}</b> + comisión <b>{COMMISSION_RATE * 100}%</b> (${commission}) →{" "}
+                      Price: <b>${BASE_PRICE}</b> + service fee <b>{COMMISSION_RATE * 100}%</b> (${commission}) →{" "}
                       <b>${total}</b>
                     </div>
 
@@ -141,15 +159,25 @@ export default function Activity() {
                       {activeBooking.status === "pending" ? (
                         <>
                           <Send size={16} />
-                          Orden enviada a la barbería (esperando confirmación)
+                          Request sent to the barber (waiting for confirmation)
                         </>
                       ) : (
                         <>
                           <CheckCircle2 size={16} />
-                          La barbería aceptó tu solicitud
+                          The barber accepted your request
                         </>
                       )}
                     </div>
+
+                    <button
+                      className="bo-btn bo-btnGhost"
+                      onClick={onCancelActive}
+                      disabled={busy}
+                      style={{ display: "inline-flex", gap: 8, alignItems: "center", justifyContent: "center" }}
+                    >
+                      <XCircle size={18} />
+                      {busy ? "Canceling..." : "Cancel booking"}
+                    </button>
                   </div>
                 </div>
 
@@ -160,8 +188,8 @@ export default function Activity() {
             ) : (
               <div className="bo-nextCard">
                 <div className="bo-nextText">
-                  <div className="bo-nextTitle">No hay citas próximas</div>
-                  <div className="bo-nextSub">Reservá un turno desde “Servicios” o un Barber</div>
+                  <div className="bo-nextTitle">No upcoming bookings</div>
+                  <div className="bo-nextSub">Book a slot from “Services” or a Barber profile</div>
                 </div>
 
                 <div className="bo-nextIconWrap" aria-hidden="true">
@@ -171,18 +199,17 @@ export default function Activity() {
             )}
           </section>
 
-          {/* (Opcional) lista rápida de historial */}
           {!loading && bookings.length > 0 ? (
             <section className="bo-block">
-              <h2 className="bo-h2">Historial</h2>
+              <h2 className="bo-h2">History</h2>
 
               <div style={{ display: "grid", gap: 10 }}>
-                {bookings.slice(0, 5).map((b) => (
+                {bookings.slice(0, 8).map((b) => (
                   <div key={b.id} className="bo-card" style={{ padding: 12 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                       <div>
                         <div style={{ fontWeight: 800 }}>
-                          {b.status.toUpperCase()} • {formatDateTime(new Date(b.scheduled_at))}
+                          {String(b.status || "").toUpperCase()} • {whenLabelFromISO(b.scheduled_at)}
                         </div>
                         <div style={{ opacity: 0.85, marginTop: 4 }}>{b.address}</div>
                       </div>

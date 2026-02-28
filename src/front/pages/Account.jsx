@@ -48,7 +48,10 @@ export default function Account() {
             badge: user.inboxCount,
             onClick: () => navigate("/inbox")
           },
-          { icon: "card", label: "Métodos de pago", onClick: () => navigate("/account/payments") },
+
+          // ✅ FIX: route must match routes.jsx
+          { icon: "card", label: "Métodos de pago", onClick: () => navigate("/payment-methods") },
+
           { icon: "history", label: "Historial de reservas", onClick: () => navigate("/account/bookings") },
           { icon: "logout", label: "Cerrar sesión", danger: true, onClick: handleLogout }
         ]
@@ -99,6 +102,7 @@ export default function Account() {
                 key={it.label}
                 className={`bo-rowBtn ${it.danger ? "bo-rowBtn--danger" : ""}`}
                 onClick={it.onClick}
+                type="button"
               >
                 <span className="bo-rowLeft">
                   <span className="bo-rowIcon">{renderIcon(it.icon)}</span>
@@ -138,7 +142,7 @@ export default function Account() {
             </label>
           </div>
 
-          <button className="bo-rowBtn" onClick={() => navigate("/account/emergency")}>
+          <button className="bo-rowBtn" onClick={() => navigate("/account/emergency")} type="button">
             <span className="bo-rowLeft">
               <span className="bo-rowIcon">{renderIcon("emergency")}</span>
               <span className="bo-rowLabel">Botón de emergencia</span>
@@ -149,7 +153,7 @@ export default function Account() {
             </span>
           </button>
 
-          <button className="bo-rowBtn" onClick={() => navigate("/account/auth")}>
+          <button className="bo-rowBtn" onClick={() => navigate("/account/auth")} type="button">
             <span className="bo-rowLeft">
               <span className="bo-rowIcon">{renderIcon("auth")}</span>
               <span className="bo-rowLabel">Autenticación activa</span>

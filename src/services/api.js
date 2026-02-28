@@ -1,6 +1,5 @@
 const API_BASE = import.meta.env.VITE_BACKEND_URL;
 
-// Small helper: parse JSON safely + throw readable errors
 async function parseJsonOrText(resp) {
   const text = await resp.text();
   try {
@@ -14,21 +13,15 @@ function authHeaders(token) {
   return token ? { Authorization: "Bearer " + token } : {};
 }
 
-// ✅ Centralized handler: if token expired => clean storage
 function handleAuthExpired(resp, payload) {
-  // Flask-JWT-Extended suele responder 401 con msg: "Token has expired"
   const msg = payload?.msg || payload?.message || "";
 
   if (resp.status === 401) {
-    // Si es un 401 por token (o cualquier 401), limpiamos sesión
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-
-    // Lanzamos un error específico para que el frontend lo pueda detectar
     throw new Error("TOKEN_EXPIRED");
   }
 
-  // otros status (403, 400, 409, etc)
   throw new Error(msg || "Request failed");
 }
 
@@ -45,11 +38,9 @@ export const login = async ({ email, password }) => {
   const payload = await parseJsonOrText(resp);
 
   if (!resp.ok) {
-    // si el backend devuelve 401 acá, es credenciales inválidas, NO token expirado
     throw new Error(payload?.msg || "Login failed");
   }
 
-  // ✅ backend can return {access_token:"..."} OR {token:"..."}
   const token = payload?.access_token || payload?.token;
   if (!token) throw new Error("Login succeeded but token was missing in response");
 
@@ -72,6 +63,38 @@ export const register = async ({ email, password, role = "client", full_name, ph
   return payload;
 };
 
+export const forgotPassword = async (email) => {
+  const resp = await fetch(API_BASE + "/api/auth/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) {
+    throw new Error(payload?.msg || "Forgot password failed");
+  }
+
+  return payload;
+};
+
+export const resetPassword = async ({ token, new_password }) => {
+  const resp = await fetch(API_BASE + "/api/auth/reset-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password }),
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) {
+    throw new Error(payload?.msg || "Reset password failed");
+  }
+
+  return payload;
+};
+
 // --------------------
 // BOOKINGS
 // --------------------
@@ -82,9 +105,7 @@ export const getMyBookings = async (token) => {
 
   const payload = await parseJsonOrText(resp);
 
-  if (!resp.ok) {
-    handleAuthExpired(resp, payload);
-  }
+  if (!resp.ok) handleAuthExpired(resp, payload);
 
   return payload;
 };
@@ -101,9 +122,91 @@ export const createBooking = async (data, token) => {
 
   const payload = await parseJsonOrText(resp);
 
-  if (!resp.ok) {
-    handleAuthExpired(resp, payload);
-  }
+  if (!resp.ok) handleAuthExpired(resp, payload);
 
   return payload;
+};
+
+export const cancelBooking = async (bookingId, token) => {
+  const resp = await fetch(API_BASE + `/api/bookings/${bookingId}/cancel`, {
+    method: "PATCH",
+    headers: { ...authHeaders(token) },
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) handleAuthExpired(resp, payload);
+
+  return payload;
+};
+
+// --------------------
+// PAYMENT METHODS
+// --------------------
+export const getPaymentMethods = async (token) => {
+  const resp = await fetch(API_BASE + "/api/payment-methods", {
+    headers: { ...authHeaders(token) },
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) handleAuthExpired(resp, payload);
+
+  return payload;
+};
+
+export const addPaymentMethod = async (data, token) => {
+  const resp = await fetch(API_BASE + "/api/payment-methods", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(token),
+    },
+    body: JSON.stringify(data),
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) handleAuthExpired(resp, payload);
+
+  return payload;
+};
+
+export const setDefaultPaymentMethod = async (pmId, token) => {
+  const resp = await fetch(API_BASE + `/api/payment-methods/${pmId}/default`, {
+    method: "PATCH",
+    headers: { ...authHeaders(token) },
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) handleAuthExpired(resp, payload);
+
+  return payload;
+};
+
+export const deletePaymentMethod = async (pmId, token) => {
+  const resp = await fetch(API_BASE + `/api/payment-methods/${pmId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders(token) },
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) handleAuthExpired(resp, payload);
+
+  return payload;
+};
+
+export const getNearbyBarbers = async ({ lat, lng, radius = 2000 }) => {
+  const resp = await fetch(
+    API_BASE +
+      `/api/places/nearby?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(
+        lng
+      )}&radius=${encodeURIComponent(radius)}`
+  );
+
+  const payload = await parseJsonOrText(resp);
+  if (!resp.ok) throw new Error(payload?.msg || "Failed to load nearby barbers");
+  return payload; // { results: [...] }
 };

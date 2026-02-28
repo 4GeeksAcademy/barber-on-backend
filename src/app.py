@@ -39,8 +39,6 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 # JWT config
 # -----------------------------
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
-
-# ✅ Make tokens last longer (avoid TOKEN_EXPIRED while building MVP)
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=7)
 
 
@@ -55,7 +53,6 @@ jwt = JWTManager(app)
 # -----------------------------
 # CORS (Codespaces SAFE)
 # -----------------------------
-# Keep flask-cors enabled (it helps), but we also enforce headers in after_request
 CORS(
     app,
     resources={r"/api/*": {"origins": "*"}},
@@ -114,7 +111,6 @@ def handle_invalid_usage(error):
 
 @app.errorhandler(500)
 def handle_500(err):
-    # Optional: print(err) to see details in terminal
     return jsonify({"msg": "Internal server error"}), 500
 
 
@@ -141,5 +137,5 @@ def serve_any_other_file(path):
 # Run
 # -----------------------------
 if __name__ == "__main__":
-    PORT = int(os.environ.get("PORT", 3001))
+    PORT = int(os.environ.get("PORT", 3001))  # ✅ back to 3000 by default
     app.run(host="0.0.0.0", port=PORT, debug=True)

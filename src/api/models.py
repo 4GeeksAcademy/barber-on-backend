@@ -1,6 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import UniqueConstraint, CheckConstraint
+from sqlalchemy import CheckConstraint
 import enum
 
 db = SQLAlchemy()
@@ -14,10 +14,6 @@ class BookingStatus(enum.Enum):
 
 
 def iso_safe(dt):
-    """
-    Si dt es datetime -> dt.isoformat()
-    Si dt es string/None -> devolver tal cual
-    """
     if dt is None:
         return None
     return dt.isoformat() if hasattr(dt, "isoformat") else dt
@@ -34,29 +30,32 @@ class User(db.Model):
     full_name = db.Column(db.String(120), nullable=True)
     phone = db.Column(db.String(40), nullable=True)
 
-    # roles: "client" o "barber"
     role = db.Column(db.String(20), nullable=False, default="client", index=True)
 
     created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+
+    # ✅ RESET PASSWORD (MVP)
+    reset_token = db.Column(db.String(255), nullable=True)
+    reset_token_expires_at = db.Column(db.DateTime, nullable=True)
 
     barber_profile = db.relationship(
         "BarberProfile",
         back_populates="user",
         uselist=False,
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
     bookings_as_client = db.relationship(
         "Booking",
         back_populates="client",
         foreign_keys="Booking.client_id",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
     bookings_as_barber = db.relationship(
         "Booking",
         back_populates="barber",
         foreign_keys="Booking.barber_id",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )
 
     def set_password(self, raw_password: str):
@@ -72,7 +71,7 @@ class User(db.Model):
             "full_name": self.full_name,
             "phone": self.phone,
             "role": self.role,
-            "created_at": iso_safe(self.created_at)
+            "created_at": iso_safe(self.created_at),
         }
 
 
@@ -107,7 +106,7 @@ class BarberProfile(db.Model):
             "rating": self.rating,
             "borough": self.borough,
             "neighborhood": self.neighborhood,
-            "created_at": iso_safe(self.created_at)
+            "created_at": iso_safe(self.created_at),
         }
 
 
@@ -119,7 +118,6 @@ class Booking(db.Model):
     client_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     barber_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
 
-    # DateTime real
     scheduled_at = db.Column(db.DateTime, nullable=False, index=True)
 
     address = db.Column(db.String(255), nullable=False)
@@ -128,16 +126,10 @@ class Booking(db.Model):
     status = db.Column(db.Enum(BookingStatus), nullable=False, default=BookingStatus.pending, index=True)
 
     created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
-
-    # OJO: esta columna TIENE que existir en DB (migración)
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now(), nullable=False)
 
     client = db.relationship("User", back_populates="bookings_as_client", foreign_keys=[client_id])
     barber = db.relationship("User", back_populates="bookings_as_barber", foreign_keys=[barber_id])
-
-    __table_args__ = (
-        UniqueConstraint("barber_id", "scheduled_at", name="uq_booking_barber_time"),
-    )
 
     def serialize(self):
         return {
@@ -150,4 +142,44 @@ class Booking(db.Model):
             "status": self.status.value if self.status else None,
             "created_at": iso_safe(self.created_at),
             "updated_at": iso_safe(self.updated_at),
+        }
+
+
+# ✅ PAYMENT METHODS (CLIENT) - DEMO ONLY (no real card data)
+class PaymentMethod(db.Model):
+    __tablename__ = "payment_method"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+
+    brand = db.Column(db.String(30), nullable=False)   # Visa / Mastercard / Amex
+    last4 = db.Column(db.String(4), nullable=False)    # 4 digits
+    exp_month = db.Column(db.Integer, nullable=False)  # 1-12
+    exp_year = db.Column(db.Integer, nullable=False)   # 2026, 2027...
+    is_default = db.Column(db.Boolean, nullable=False, default=False, index=True)
+
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+
+    user = db.relationship(
+        "User",
+        backref=db.backref("payment_methods", lazy=True, cascade="all, delete-orphan"),
+    )
+
+    __table_args__ = (
+        CheckConstraint("length(last4) = 4", name="ck_pm_last4_len4"),
+        CheckConstraint("exp_month >= 1 AND exp_month <= 12", name="ck_pm_exp_month_range"),
+        CheckConstraint("exp_year >= 2020", name="ck_pm_exp_year_min"),
+    )
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "brand": self.brand,
+            "last4": self.last4,
+            "exp_month": self.exp_month,
+            "exp_year": self.exp_year,
+            "is_default": self.is_default,
+            "created_at": iso_safe(self.created_at),
         }

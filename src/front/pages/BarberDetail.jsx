@@ -5,13 +5,17 @@ import { createBooking } from "../../services/api.js";
 
 /**
  * BarberDetail.jsx (PRO MVP)
- * - Booking confirmation modal (premium UI)
- * - Relative time presets ✅
- * - Countdown ✅
- * - Home service / In-shop ✅
- * - Sends scheduled_at as real ISO (UTC Z) ✅ (fixes timezone "past" issues)
- * - Handles TOKEN_EXPIRED ✅
- * - Better CORS / backend error messages ✅
+ * - Premium booking modal
+ * - ✅ TODAY real-time slots (no tomorrow)
+ * - ✅ Countdown
+ * - ✅ Home / In-shop
+ * - ✅ Sends scheduled_at as ISO (UTC Z)
+ * - ✅ Clear 409 slot-taken message
+ * - ✅ Slots refresh while modal is open
+ *
+ * IMPORTANT FIX:
+ * - Keep selected slot as LOCAL timestamp (ms) to avoid day-shifts/confusion,
+ *   and only convert to ISO at send-time.
  */
 
 export default function BarberDetail() {
@@ -28,23 +32,13 @@ export default function BarberDetail() {
 
   const [open, setOpen] = useState(false);
 
-  const presets = useMemo(
-    () => [
-      { label: "In 30 min", minutes: 30 },
-      { label: "In 1 hour", minutes: 60 },
-      { label: "In 2 hours", minutes: 120 },
-      { label: "In 3 hours", minutes: 180 },
-      { label: "In 4 hours", minutes: 240 },
-    ],
-    []
-  );
-
   // Form state
-  const [selectedMinutes, setSelectedMinutes] = useState(60);
-  const [scheduledAtLocal, setScheduledAtLocal] = useState(""); // "YYYY-MM-DDTHH:mm" (local display)
   const [serviceMode, setServiceMode] = useState("home"); // "home" | "shop"
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Time selection (LOCAL ms)
+  const [selectedSlotMs, setSelectedSlotMs] = useState(null);
 
   // UX state
   const [loading, setLoading] = useState(false);
@@ -54,49 +48,90 @@ export default function BarberDetail() {
   // Countdown
   const [countdown, setCountdown] = useState("00:00");
 
+  // Refresh slots tick while modal open (every 30s)
+  const [slotTick, setSlotTick] = useState(0);
+
+  // -------------------------
   // Helpers
+  // -------------------------
   const pad = (n) => String(n).padStart(2, "0");
 
-  const toDateTimeLocalString = (dateObj) => {
-    const yyyy = dateObj.getFullYear();
-    const mm = pad(dateObj.getMonth() + 1);
-    const dd = pad(dateObj.getDate());
-    const hh = pad(dateObj.getHours());
-    const mi = pad(dateObj.getMinutes());
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-  };
+  function roundUpToMinutes(date, stepMinutes) {
+    const d = new Date(date);
+    d.setSeconds(0, 0);
+    const ms = stepMinutes * 60 * 1000;
+    return new Date(Math.ceil(d.getTime() / ms) * ms);
+  }
 
-  const fromDateTimeLocalToDate = (value) => {
-    // "YYYY-MM-DDTHH:mm" -> Date(local)
-    if (!value || !value.includes("T")) return null;
-    const [d, t] = value.split("T");
-    const [yyyy, mm, dd] = d.split("-").map(Number);
-    const [hh, mi] = t.split(":").map(Number);
-    return new Date(yyyy, mm - 1, dd, hh, mi, 0, 0);
-  };
+  /**
+   * Build slots ONLY for "today" in user's LOCAL TIME
+   */
+  function buildTodaySlots({ stepMinutes = 30, maxSlots = 18, endHour = 21 }) {
+    const now = new Date();
 
-  const formatCountdown = (ms) => {
+    // start: next rounded slot, plus small buffer
+    const bufferMs = 2 * 60 * 1000;
+    const start = roundUpToMinutes(new Date(now.getTime() + bufferMs), stepMinutes);
+
+    // end: today at endHour:00
+    const end = new Date(now);
+    end.setHours(endHour, 0, 0, 0);
+
+    const slots = [];
+    let cursor = start;
+
+    while (cursor <= end && slots.length < maxSlots) {
+      // Keep ONLY today (local)
+      const sameDay =
+        cursor.getFullYear() === now.getFullYear() &&
+        cursor.getMonth() === now.getMonth() &&
+        cursor.getDate() === now.getDate();
+
+      if (sameDay) slots.push(new Date(cursor));
+      cursor = new Date(cursor.getTime() + stepMinutes * 60 * 1000);
+    }
+
+    return slots;
+  }
+
+  function formatTimeOnly(dt) {
+    return dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function formatTodayLabel(dt) {
+    const d = dt.toLocaleDateString([], { weekday: "short", month: "short", day: "2-digit" });
+    return `Today • ${d}`;
+  }
+
+  function formatCountdown(ms) {
     if (ms <= 0) return "00:00";
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${pad(minutes)}:${pad(seconds)}`;
-  };
+  }
 
-  const computeLocalFromPreset = (minutes) => {
-    const now = new Date();
-    const bufferMs = 2 * 60 * 1000; // ✅ safety buffer
-    const target = new Date(now.getTime() + minutes * 60 * 1000 + bufferMs);
-    return toDateTimeLocalString(target);
-  };
+  const requestStatusCopy = useMemo(() => {
+    if (serviceMode === "shop") return "Request sent to the barber (in-shop). Waiting for confirmation.";
+    return "Request sent to the barber (home service). Waiting for confirmation.";
+  }, [serviceMode]);
 
-  // ✅ THIS is the important fix:
-  // Convert local "YYYY-MM-DDTHH:mm" to ISO "....Z"
-  const localToISOZ = (localValue) => {
-    const d = fromDateTimeLocalToDate(localValue);
-    if (!d) return "";
-    return d.toISOString(); // ✅ includes Z (UTC)
-  };
+  // ✅ Slots regenerate while modal open
+  const slots = useMemo(() => {
+    return buildTodaySlots({ stepMinutes: 30, maxSlots: 18, endHour: 21 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, slotTick]);
+
+  // Tick for slots refresh
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(() => setSlotTick((t) => t + 1), 30000);
+    return () => clearInterval(id);
+  }, [open]);
+
+  const selectedSlotDate = useMemo(() => {
+    return selectedSlotMs ? new Date(selectedSlotMs) : null;
+  }, [selectedSlotMs]);
 
   const resetForm = () => {
     setError("");
@@ -104,8 +139,7 @@ export default function BarberDetail() {
     setNotes("");
     setServiceMode("home");
     setAddress("");
-    setSelectedMinutes(60);
-    setScheduledAtLocal(computeLocalFromPreset(60));
+    setSelectedSlotMs(null);
   };
 
   const openModal = () => {
@@ -113,10 +147,22 @@ export default function BarberDetail() {
     setOpen(true);
   };
 
-  const onPickPreset = (minutes) => {
-    setSelectedMinutes(minutes);
-    setScheduledAtLocal(computeLocalFromPreset(minutes));
-  };
+  // When modal opens, set default slot to first available today
+  useEffect(() => {
+    if (!open) return;
+
+    // If no selection -> pick first
+    if (selectedSlotMs == null && slots.length > 0) {
+      setSelectedSlotMs(slots[0].getTime());
+      return;
+    }
+
+    // If selection is now in the past -> move to first
+    if (selectedSlotMs != null && selectedSlotMs < Date.now() && slots.length > 0) {
+      setSelectedSlotMs(slots[0].getTime());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, slots.length]);
 
   const onChangeMode = (mode) => {
     setServiceMode(mode);
@@ -126,7 +172,7 @@ export default function BarberDetail() {
 
   const validate = (finalAddress) => {
     if (!barberId || Number.isNaN(barberId)) return "Invalid barber.";
-    if (!scheduledAtLocal) return "Pick a time.";
+    if (selectedSlotMs == null) return "Pick a time slot for today.";
     if (!finalAddress || finalAddress.trim().length < 6) return "Enter a valid address.";
     return "";
   };
@@ -136,24 +182,18 @@ export default function BarberDetail() {
     if (!open) return;
 
     const tick = () => {
-      const d = fromDateTimeLocalToDate(scheduledAtLocal);
-      if (!d) {
+      if (selectedSlotMs == null) {
         setCountdown("00:00");
         return;
       }
-      const diff = d.getTime() - Date.now();
+      const diff = selectedSlotMs - Date.now();
       setCountdown(formatCountdown(diff));
     };
 
     tick();
     const interval = setInterval(tick, 250);
     return () => clearInterval(interval);
-  }, [open, scheduledAtLocal]);
-
-  // Init default time
-  useEffect(() => {
-    setScheduledAtLocal(computeLocalFromPreset(60));
-  }, []);
+  }, [open, selectedSlotMs]);
 
   const onConfirm = async () => {
     setError("");
@@ -174,9 +214,12 @@ export default function BarberDetail() {
       return;
     }
 
-    const scheduled_at = localToISOZ(scheduledAtLocal);
-    if (!scheduled_at) {
-      setError("Invalid time value.");
+    // Convert LOCAL selection -> ISO Z for backend
+    const scheduled_at = new Date(selectedSlotMs).toISOString();
+
+    // extra safety: block if already passed
+    if (new Date(scheduled_at).getTime() < Date.now()) {
+      setError("That slot is already in the past. Pick a new time.");
       return;
     }
 
@@ -184,7 +227,7 @@ export default function BarberDetail() {
     try {
       const payload = {
         barber_id: barberId,
-        scheduled_at, // ✅ ISO with Z
+        scheduled_at,
         address: finalAddress.trim(),
         notes: notes.trim() || null,
       };
@@ -206,10 +249,16 @@ export default function BarberDetail() {
         return;
       }
 
-      const msgLower = String(err?.message || "").toLowerCase();
+      const msgRaw = String(err?.message || "");
+      const low = msgRaw.toLowerCase();
 
-      // If CORS blocks the response, the browser often throws "Failed to fetch"
-      if (msgLower.includes("failed to fetch")) {
+      // ✅ 409 slot taken
+      if (low.includes("already booked") || low.includes("time slot") || low.includes("409") || low.includes("taken")) {
+        setError("That time is already taken. Please pick another slot.");
+        return;
+      }
+
+      if (low.includes("failed to fetch")) {
         setError(
           "CORS / backend connection issue (Failed to fetch).\n" +
             "Fix Flask CORS for your Codespaces domain (*.app.github.dev) and restart backend."
@@ -217,14 +266,17 @@ export default function BarberDetail() {
         return;
       }
 
-      setError(err?.message || "Error creating booking");
+      setError(msgRaw || "Error creating booking");
     } finally {
       setLoading(false);
     }
   };
 
-  // Derived for debug (optional)
-  const scheduledISO = useMemo(() => localToISOZ(scheduledAtLocal), [scheduledAtLocal]);
+  // Debug ISO
+  const debugISO = useMemo(() => {
+    if (selectedSlotMs == null) return "-";
+    return new Date(selectedSlotMs).toISOString();
+  }, [selectedSlotMs]);
 
   return (
     <div className="bo-app">
@@ -332,13 +384,15 @@ export default function BarberDetail() {
                     padding: 12,
                   }}
                 >
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>Time</div>
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>Time (today)</div>
 
                   <div style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div>
-                      <div style={{ fontSize: 16, fontWeight: 900 }}>Confirm booking</div>
+                      <div style={{ fontSize: 16, fontWeight: 900 }}>Pick a time</div>
                       <div style={{ fontSize: 12, opacity: 0.65, marginTop: 2 }}>
-                        {presets.find((p) => p.minutes === selectedMinutes)?.label || "Selected time"}
+                        {selectedSlotDate
+                          ? `${formatTodayLabel(selectedSlotDate)} • ${formatTimeOnly(selectedSlotDate)}`
+                          : "Select a slot"}
                       </div>
                     </div>
 
@@ -360,31 +414,39 @@ export default function BarberDetail() {
                     </div>
                   </div>
 
+                  {/* Slots grid */}
                   <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    {presets.map((p) => {
-                      const active = p.minutes === selectedMinutes;
-                      return (
-                        <button
-                          key={p.minutes}
-                          type="button"
-                          disabled={loading}
-                          onClick={() => onPickPreset(p.minutes)}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: 14,
-                            border: "1px solid rgba(255,255,255,0.12)",
-                            background: active ? "rgba(255,255,255,0.12)" : "transparent",
-                            cursor: loading ? "not-allowed" : "pointer",
-                            fontWeight: 800,
-                            fontSize: 13,
-                            color: "inherit",
-                          }}
-                        >
-                          {p.label}
-                        </button>
-                      );
-                    })}
+                    {slots.length === 0 ? (
+                      <div style={{ fontSize: 12, opacity: 0.7 }}>No available slots for today. Try again later.</div>
+                    ) : (
+                      slots.map((s) => {
+                        const ms = s.getTime();
+                        const active = ms === selectedSlotMs;
+                        return (
+                          <button
+                            key={ms}
+                            type="button"
+                            disabled={loading}
+                            onClick={() => setSelectedSlotMs(ms)}
+                            style={{
+                              padding: "10px 12px",
+                              borderRadius: 14,
+                              border: "1px solid rgba(255,255,255,0.12)",
+                              background: active ? "rgba(255,255,255,0.12)" : "transparent",
+                              cursor: loading ? "not-allowed" : "pointer",
+                              fontWeight: 900,
+                              fontSize: 13,
+                              color: "inherit",
+                            }}
+                          >
+                            {formatTimeOnly(s)}
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
+
+                  <div style={{ fontSize: 12, opacity: 0.65, marginTop: 10 }}>{requestStatusCopy}</div>
                 </div>
 
                 {/* SERVICE MODE */}
@@ -428,17 +490,13 @@ export default function BarberDetail() {
                   </div>
 
                   <div style={{ fontSize: 12, opacity: 0.65 }}>
-                    {serviceMode === "shop"
-                      ? `Shop address will be used: ${barberShopAddress}`
-                      : "Enter your address for home service."}
+                    {serviceMode === "shop" ? `Shop address will be used: ${barberShopAddress}` : "Enter your address for home service."}
                   </div>
                 </div>
 
                 {/* ADDRESS */}
                 <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>
-                    Address {serviceMode === "shop" ? "(shop)" : "(home)"}
-                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.8 }}>Address {serviceMode === "shop" ? "(shop)" : "(home)"}</div>
                   <input
                     value={serviceMode === "shop" ? barberShopAddress : address}
                     onChange={(e) => setAddress(e.target.value)}
@@ -527,7 +585,7 @@ export default function BarberDetail() {
                   </button>
 
                   <button
-                    disabled={loading}
+                    disabled={loading || slots.length === 0}
                     onClick={onConfirm}
                     style={{
                       padding: "12px 12px",
@@ -537,6 +595,7 @@ export default function BarberDetail() {
                       cursor: loading ? "not-allowed" : "pointer",
                       fontWeight: 950,
                       color: "inherit",
+                      opacity: slots.length === 0 ? 0.6 : 1,
                     }}
                   >
                     {loading ? "Booking..." : "Confirm"}
@@ -548,9 +607,7 @@ export default function BarberDetail() {
                 </div>
 
                 {/* Debug */}
-                <div style={{ fontSize: 11, opacity: 0.35, marginTop: 8 }}>
-                  scheduled_at (ISO): {scheduledISO || "-"}
-                </div>
+                <div style={{ fontSize: 11, opacity: 0.35, marginTop: 8 }}>scheduled_at (ISO): {debugISO}</div>
               </div>
             </div>
           )}

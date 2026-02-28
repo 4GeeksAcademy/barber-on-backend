@@ -11,16 +11,19 @@ import Account from "./pages/Account";
 import Tips from "./pages/Tips";
 import BarberDetail from "./pages/BarberDetail";
 import MenTrends from "./pages/MenTrends";
+import PaymentMethods from "./pages/PaymentMethods";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";   // ✅ NUEVO
+import ResetPassword from "./pages/ResetPassword";     // ✅ NUEVO
 
 function isAuthed() {
   return !!localStorage.getItem("token");
 }
 
 function PublicOnly({ children }) {
-  // If you are already logged in, don't allow /login or /register
+  // If you are already logged in, don't allow auth pages
   return isAuthed() ? <Navigate to="/home" replace /> : children;
 }
 
@@ -32,7 +35,8 @@ function PrivateRoute({ children }) {
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* PUBLIC ROUTES (no Layout / no BottomNav) */}
+      {/* ---------------- PUBLIC ROUTES (NO Layout) ---------------- */}
+
       <Route
         path="/login"
         element={
@@ -41,6 +45,7 @@ export default function AppRoutes() {
           </PublicOnly>
         }
       />
+
       <Route
         path="/register"
         element={
@@ -50,7 +55,28 @@ export default function AppRoutes() {
         }
       />
 
-      {/* PROTECTED APP ROUTES (with Layout) */}
+      {/* ✅ FORGOT PASSWORD */}
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicOnly>
+            <ForgotPassword />
+          </PublicOnly>
+        }
+      />
+
+      {/* ✅ RESET PASSWORD */}
+      <Route
+        path="/reset-password"
+        element={
+          <PublicOnly>
+            <ResetPassword />
+          </PublicOnly>
+        }
+      />
+
+      {/* ---------------- PROTECTED APP ROUTES (WITH Layout) ---------------- */}
+
       <Route
         element={
           <PrivateRoute>
@@ -60,7 +86,7 @@ export default function AppRoutes() {
       >
         <Route path="/home" element={<Home />} />
         <Route path="/services" element={<Services />} />
-         <Route path="/services/men/trends" element={<MenTrends />} />
+        <Route path="/services/men/trends" element={<MenTrends />} />
         <Route path="/products" element={<Products />} />
         <Route path="/activity" element={<Activity />} />
         <Route path="/appointments" element={<Appointments />} />
@@ -68,9 +94,11 @@ export default function AppRoutes() {
         <Route path="/account" element={<Account />} />
         <Route path="/tips" element={<Tips />} />
         <Route path="/barbers/:id" element={<BarberDetail />} />
+        <Route path="/payment-methods" element={<PaymentMethods />} />
       </Route>
 
-      {/* FALLBACK */}
+      {/* ---------------- FALLBACK ---------------- */}
+
       <Route
         path="*"
         element={<Navigate to={isAuthed() ? "/home" : "/login"} replace />}

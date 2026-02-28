@@ -38,7 +38,6 @@ export default function Login() {
       navigate("/home");
     } catch (err) {
       const msg = String(err?.message || "Failed to login");
-      // Friendly CORS / network hint
       if (msg.toLowerCase().includes("failed to fetch")) {
         setError(
           "Failed to fetch. Check VITE_BACKEND_URL, backend port (3001), and that the backend port is Public."
@@ -128,6 +127,21 @@ export default function Login() {
                 {loading ? "Logging in..." : "Login"}
               </button>
 
+              {/* ✅ FORGOT PASSWORD LINK */}
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -2 }}>
+                <Link
+                  to="/forgot-password"
+                  style={{
+                    fontSize: 12,
+                    opacity: 0.8,
+                    textDecoration: "none",
+                    color: "inherit",
+                  }}
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
               {/* LIGHT REGISTER BUTTON */}
               <Link
                 to="/register"
@@ -139,7 +153,7 @@ export default function Login() {
                   padding: "12px 14px",
                   borderRadius: 12,
                   border: "1px solid rgba(255,255,255,0.28)",
-                  background: "rgba(255,255,255,0.18)", // <-- light
+                  background: "rgba(255,255,255,0.18)",
                   color: "inherit",
                   textDecoration: "none",
                   fontWeight: 900,
