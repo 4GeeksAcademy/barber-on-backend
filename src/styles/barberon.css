@@ -1783,3 +1783,37 @@ body {
   white-space: nowrap;
   max-width: 230px; /* ajustalo según tu layout */
 }
+.bo-hasImg{
+  position: relative;
+  overflow: hidden;
+}
+
+.bo-hasImg .bo-cardImg{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  z-index: 0;
+}
+
+.bo-hasImg .bo-imgOverlay{
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(to top, rgba(0,0,0,0.86), rgba(0,0,0,0.20));
+}
+
+.bo-hasImg .bo-miniTop,
+.bo-hasImg .bo-miniTitle,
+.bo-hasImg .bo-imageLabel{
+  position: relative;
+  z-index: 2;
+}
+.bo-imageCard {
+  position: relative;
+  height: 150px; /* antes era más chico */
+  border-radius: 18px;
+  overflow: hidden;
+}

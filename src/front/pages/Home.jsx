@@ -11,34 +11,66 @@ import {
   MapPin,
 } from "lucide-react";
 
-import { getNearbyBarbers } from "../../services/api"; // <-- ajusta si hace falta
+import { getNearbyBarbers } from "../../services/api";
 
 const fallbackShops = [
   { id: 1, name: "Elegance Barbershop", address: "428 West St, Astoria, NY" },
   { id: 2, name: "The Gentleman's Parlor", address: "833 38th Ave, Astoria, NY" },
 ];
 
+/* =========================
+   IMÁGENES REALES QUE FUNCIONAN
+========================= */
+
+const HAIRCUT_IMAGES = [
+  "https://img.freepik.com/fotos-premium/cliente-haciendo-corte-pelo-salon-barberia_148840-10682.jpg",
+  "https://img.freepik.com/foto-gratis/hombre-corte-pelo-peluqueria_23-2148895008.jpg",
+  "https://img.freepik.com/foto-gratis/barbero-cortando-cabello-hombre_23-2148765761.jpg",
+  "https://img.freepik.com/foto-gratis/hombre-recibiendo-corte-pelo-barberia_23-2148895013.jpg",
+  "https://www.hairfinder.com/es/imagenes/consejos-de-peluqueria.jpg"
+];
+
+const BARBERSHOP_IMAGES = [
+  "https://img.freepik.com/foto-gratis/interior-salon-barberia-moderno_23-2148905043.jpg",
+  "https://img.freepik.com/foto-gratis/barberia-moderna-sillas-espejos_23-2148905041.jpg"
+];
+
+function randomImage(list) {
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 export default function Home() {
   const navigate = useNavigate();
-
   const [query, setQuery] = useState("");
 
-  // Nearby state
   const [nearby, setNearby] = useState([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError, setNearbyError] = useState("");
 
-  const suggestions = useMemo(
-    () => [
-      { title: "Trends", badge: null },
-      { title: "Haircuts", badge: null },
-      { title: "Shave", badge: "Deal" },
-      { title: "Care", badge: "20% OFF" },
-    ],
-    []
-  );
+  /* =========================
+     IMÁGENES ALEATORIAS AL CARGAR
+  ========================= */
 
-  // Load nearby on mount
+  const [suggestionImages, setSuggestionImages] = useState([]);
+  const [topImage, setTopImage] = useState("");
+  const [latestImage, setLatestImage] = useState("");
+
+  useEffect(() => {
+    setSuggestionImages([
+      randomImage(HAIRCUT_IMAGES),
+      randomImage(HAIRCUT_IMAGES),
+      randomImage(HAIRCUT_IMAGES),
+      randomImage(HAIRCUT_IMAGES),
+    ]);
+
+    setTopImage(randomImage(BARBERSHOP_IMAGES));
+    setLatestImage(randomImage(HAIRCUT_IMAGES));
+  }, []);
+
+  /* =========================
+     GEOLOCATION
+  ========================= */
+
   useEffect(() => {
     let isMounted = true;
 
@@ -49,6 +81,7 @@ export default function Home() {
 
         if (!navigator.geolocation) {
           setNearbyError("Geolocation is not supported.");
+          setNearbyLoading(false);
           return;
         }
 
@@ -64,7 +97,7 @@ export default function Home() {
               setNearby(Array.isArray(data?.results) ? data.results : []);
             } catch (e) {
               if (!isMounted) return;
-              setNearbyError(e?.message || "Failed to load nearby barbers.");
+              setNearbyError("Failed to load nearby barbers.");
             } finally {
               if (isMounted) setNearbyLoading(false);
             }
@@ -73,12 +106,11 @@ export default function Home() {
             if (!isMounted) return;
             setNearbyError("Location permission denied.");
             setNearbyLoading(false);
-          },
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+          }
         );
       } catch (e) {
         if (!isMounted) return;
-        setNearbyError(e?.message || "Failed to load nearby barbers.");
+        setNearbyError("Failed to load nearby barbers.");
         setNearbyLoading(false);
       }
     }
@@ -89,7 +121,6 @@ export default function Home() {
     };
   }, []);
 
-  // Choose data source: nearby if available, else fallback
   const shopsSource = nearby.length ? nearby : fallbackShops;
 
   const filteredShops = useMemo(() => {
@@ -107,18 +138,6 @@ export default function Home() {
     navigate(`/barbers/${id}`);
   }
 
-  function handleReserve(e, id) {
-    e.preventDefault();
-    e.stopPropagation();
-    goToBarber(id);
-  }
-
-  function handleInfo(e, id) {
-    e.preventDefault();
-    e.stopPropagation();
-    goToBarber(id);
-  }
-
   return (
     <>
       <header className="bo-header">
@@ -132,7 +151,6 @@ export default function Home() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="What are you looking for?"
-            aria-label="Search"
           />
         </div>
 
@@ -142,8 +160,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Nearby status */}
-      <div style={{ padding: "6px 2px", opacity: 0.9, display: "flex", gap: 8, alignItems: "center" }}>
+      <div style={{ padding: "6px 2px", display: "flex", gap: 8, alignItems: "center" }}>
         <MapPin size={16} />
         {nearbyLoading && <span>Loading nearby barbers...</span>}
         {!nearbyLoading && nearby.length > 0 && <span>Showing barbers near you</span>}
@@ -151,9 +168,7 @@ export default function Home() {
         {nearbyError && <span>{nearbyError}</span>}
       </div>
 
-      {/* ========================= */}
-      {/* BARBERSHOP LIST */}
-      {/* ========================= */}
+      {/* BARBERS LIST */}
       <section className="bo-list">
         {filteredShops.map((s, idx) => {
           const id = s.place_id || s.id || idx;
@@ -163,98 +178,62 @@ export default function Home() {
             <article
               className="bo-card bo-cardRow"
               key={id}
-              role="button"
-              tabIndex={0}
-              style={{ cursor: "pointer" }}
               onClick={() => goToBarber(id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") goToBarber(id);
-              }}
+              style={{ cursor: "pointer" }}
             >
               <div className="bo-cardLeft">
                 <div className="bo-roundIcon">
                   <Clock size={18} />
                 </div>
-
                 <div>
                   <div className="bo-cardTitle">{s.name}</div>
                   <div className="bo-cardSub">{address}</div>
                 </div>
               </div>
-
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button
-                  className="bo-chipBtn"
-                  type="button"
-                  onClick={(e) => handleReserve(e, id)}
-                  style={{ padding: "6px 10px", fontSize: 12 }}
-                >
-                  <CalendarDays size={14} />
-                  <span>Book</span>
-                </button>
-
-                <button
-                  className="bo-iconBtn"
-                  type="button"
-                  aria-label="More info"
-                  onClick={(e) => handleInfo(e, id)}
-                >
-                  <Info size={18} />
-                </button>
-              </div>
             </article>
           );
         })}
-
-        {filteredShops.length === 0 && (
-          <div className="bo-empty" style={{ padding: "10px 2px", opacity: 0.85 }}>
-            No results. Try a different search.
-          </div>
-        )}
       </section>
 
-      {/* ========================= */}
       {/* SUGGESTIONS */}
-      {/* ========================= */}
       <div className="bo-sectionHead">
         <h3>Suggestions</h3>
-        <button className="bo-roundBtn" type="button" aria-label="See more">
-          <ArrowRight size={18} />
-        </button>
       </div>
 
       <section className="bo-hscroll">
-        {suggestions.map((c) => (
-          <div className="bo-miniCard" key={c.title} role="button" tabIndex={0}>
-            <div className="bo-miniTop">
-              <div className="bo-miniGlyph" />
-              {c.badge && <span className="bo-badge">{c.badge}</span>}
-            </div>
-            <div className="bo-miniTitle">{c.title}</div>
+        {["Trends", "Haircuts", "Shave", "Care"].map((title, i) => (
+          <div className="bo-miniCard bo-hasImg" key={title}>
+            <img
+              className="bo-cardImg"
+              src={suggestionImages[i]}
+              alt=""
+            />
+            <div className="bo-imgOverlay" />
+            <div className="bo-miniTitle">{title}</div>
           </div>
         ))}
       </section>
 
-      {/* ========================= */}
-      {/* INSPIRATION */}
-      {/* ========================= */}
+      {/* INSPIRED */}
       <div className="bo-sectionHead">
         <h3>Get inspired by the best</h3>
       </div>
 
       <section className="bo-grid2">
-        <div className="bo-imageCard" role="button" tabIndex={0}>
-          <div className="bo-imagePh" />
+        <div className="bo-imageCard bo-hasImg">
+          <img className="bo-cardImg" src={topImage} alt="" />
+          <div className="bo-imgOverlay" />
           <div className="bo-imageLabel">Top barbers</div>
         </div>
 
-        <div className="bo-imageCard" role="button" tabIndex={0}>
-          <div className="bo-imagePh" />
+        <div className="bo-imageCard bo-hasImg">
+          <img className="bo-cardImg" src={latestImage} alt="" />
+          <div className="bo-imgOverlay" />
           <div className="bo-imageLabel">Latest styles</div>
         </div>
       </section>
 
-      <button className="bo-fab" type="button" aria-label="At home service">
+      <button className="bo-fab" type="button">
         <span className="bo-fabIcon">
           <HomeIcon size={18} />
         </span>
