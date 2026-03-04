@@ -12,6 +12,8 @@ import Tips from "./pages/Tips";
 import BarberDetail from "./pages/BarberDetail";
 import MenTrends from "./pages/MenTrends";
 import PaymentMethods from "./pages/PaymentMethods";
+import ServicesMap from "./pages/ServicesMap";
+import AppointmentNew from "./pages/AppointmentNew";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -85,6 +87,7 @@ export default function AppRoutes() {
         }
       >
         <Route path="/home" element={<Home />} />
+        <Route path="/appointments/new" element={<AppointmentNew />} />
         <Route path="/services" element={<Services />} />
         <Route path="/services/men/trends" element={<MenTrends />} />
         <Route path="/products" element={<Products />} />
@@ -95,6 +98,7 @@ export default function AppRoutes() {
         <Route path="/tips" element={<Tips />} />
         <Route path="/barbers/:id" element={<BarberDetail />} />
         <Route path="/payment-methods" element={<PaymentMethods />} />
+        <Route path="/services-map" element={<ServicesMap />} />
       </Route>
 
       {/* ---------------- FALLBACK ---------------- */}

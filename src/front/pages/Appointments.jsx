@@ -40,6 +40,24 @@ export default function Appointments() {
     <div style={{ padding: 12 }}>
       <h2 style={{ margin: 8 }}>Appointments</h2>
 
+      {/* Botón para crear nueva cita */}
+      {hasToken && (
+        <button
+          style={{
+            margin: 8,
+            padding: "10px 12px",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,0.14)",
+            background: "rgba(255,255,255,0.08)",
+            cursor: "pointer",
+            fontWeight: 800
+          }}
+          onClick={() => navigate("/services-map")}
+        >
+          Book near me
+        </button>
+      )}
+
       {!hasToken && (
         <div className="bo-card" style={{ margin: 8, padding: 12 }}>
           <p style={{ margin: 0, opacity: 0.85 }}>
@@ -53,7 +71,7 @@ export default function Appointments() {
               border: "1px solid rgba(255,255,255,0.14)",
               background: "rgba(255,255,255,0.08)",
               cursor: "pointer",
-              fontWeight: 800,
+              fontWeight: 800
             }}
             onClick={() => navigate("/login")}
           >
@@ -71,7 +89,7 @@ export default function Appointments() {
             margin: 8,
             padding: 12,
             border: "1px solid rgba(255, 80, 80, 0.25)",
-            background: "rgba(255, 80, 80, 0.10)",
+            background: "rgba(255, 80, 80, 0.10)"
           }}
         >
           {error}
@@ -88,9 +106,11 @@ export default function Appointments() {
             <p style={{ margin: 0 }}>
               <strong>Date:</strong> {b.scheduled_at}
             </p>
+
             <p style={{ margin: 0 }}>
               <strong>Address:</strong> {b.address}
             </p>
+
             <p style={{ margin: 0 }}>
               <strong>Status:</strong> {b.status}
             </p>

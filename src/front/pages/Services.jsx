@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Sparkles, PawPrint, Scissors, ArrowRight } from "lucide-react";
+import { Sparkles, PawPrint, Scissors, ArrowRight, Map } from "lucide-react";
 
 export default function Services() {
   const navigate = useNavigate();
@@ -11,6 +11,18 @@ export default function Services() {
       </div>
 
       <div className="bo-heroImage" />
+
+      {/* 🔥 BOTÓN MAPA NUEVO */}
+      <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+        <button
+          type="button"
+          className="bo-mapBtn"
+          onClick={() => navigate("/services-map")}
+        >
+          <Map size={18} />
+          Explore Map
+        </button>
+      </div>
 
       <section className="bo-servicesGrid">
         
@@ -39,7 +51,6 @@ export default function Services() {
 
           <div className="bo-serviceLabel">Men</div>
 
-          {/* BOTÓN NUEVO */}
           <button
             type="button"
             className="bo-menTrendsBtn"

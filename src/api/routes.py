@@ -110,12 +110,18 @@ def setup_routes():
         );
         out center 25;
         """
-        r = requests.post(
-            "https://overpass-api.de/api/interpreter",
-            data=query.encode("utf-8"),
-            timeout=20
-        )
-        data = r.json()
+
+        try:
+            r = requests.post(
+                "https://overpass-api.de/api/interpreter",
+                data=query.encode("utf-8"),
+                timeout=25
+            )
+            r.raise_for_status()
+            data = r.json()
+        except Exception:
+            # ✅ Nunca crashear. Si Overpass falla, devolvemos vacío.
+            return []
 
         results = []
         for el in data.get("elements", []):
@@ -167,10 +173,8 @@ def setup_routes():
         except Exception:
             radius_int = 2000
 
-        # Keep radius in a safe range for demos
         radius_int = max(500, min(radius_int, 5000))
 
-        # Try Google first (if key exists)
         key = os.getenv("GOOGLE_PLACES_API_KEY")
 
         if key:
@@ -216,7 +220,6 @@ def setup_routes():
                     "source": "google",
                 }), 200
 
-            # Google failed or denied -> fallback
             fallback = _overpass_barbers(lat, lng, radius_int)
             return jsonify({
                 "results": fallback,
@@ -226,7 +229,6 @@ def setup_routes():
                 "source": "overpass_fallback",
             }), 200
 
-        # No Google key -> fallback only
         fallback = _overpass_barbers(lat, lng, radius_int)
         return jsonify({
             "results": fallback,
@@ -235,6 +237,12 @@ def setup_routes():
             "raw_next_page_token": None,
             "source": "overpass_fallback",
         }), 200
+
+    # ✅ Alias para que no se rompa tu frontend si usa /api/nearby-barbers
+    @api.route("/nearby-barbers", methods=["GET"])
+    def nearby_barbers_alias():
+        # Reusa exactamente la lógica de /places/nearby
+        return places_nearby()
 
     # --------------------
     # ✅ PLACES PHOTO (OPTIONAL PROXY) - only works if Google key works

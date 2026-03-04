@@ -1817,3 +1817,21 @@ body {
   border-radius: 18px;
   overflow: hidden;
 }
+.bo-mapBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 30px;
+  border: 1px solid #c6a75e;
+  background: linear-gradient(135deg, #1a1a1a, #111);
+  color: #c6a75e;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.bo-mapBtn:hover {
+  background: linear-gradient(135deg, #c6a75e, #a8873f);
+  color: #000;
+  transform: translateY(-2px);
+}

@@ -137,5 +137,5 @@ def serve_any_other_file(path):
 # Run
 # -----------------------------
 if __name__ == "__main__":
-    PORT = int(os.environ.get("PORT", 3001))  # ✅ back to 3000 by default
+    PORT = int(os.environ.get("PORT", 3001))  # ✅ backend on 3001 by default
     app.run(host="0.0.0.0", port=PORT, debug=True)
