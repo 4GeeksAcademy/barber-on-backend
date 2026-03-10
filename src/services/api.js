@@ -25,9 +25,6 @@ function handleAuthExpired(resp, payload) {
   throw new Error(msg || "Request failed");
 }
 
-// --------------------
-// AUTH
-// --------------------
 export const login = async ({ email, password }) => {
   const resp = await fetch(API_BASE + "/api/auth/login", {
     method: "POST",
@@ -47,7 +44,13 @@ export const login = async ({ email, password }) => {
   return { ...payload, token };
 };
 
-export const register = async ({ email, password, role = "client", full_name, phone }) => {
+export const register = async ({
+  email,
+  password,
+  role = "client",
+  full_name,
+  phone,
+}) => {
   const resp = await fetch(API_BASE + "/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -95,9 +98,6 @@ export const resetPassword = async ({ token, new_password }) => {
   return payload;
 };
 
-// --------------------
-// BOOKINGS
-// --------------------
 export const getMyBookings = async (token) => {
   const resp = await fetch(API_BASE + "/api/bookings/me", {
     headers: { ...authHeaders(token) },
@@ -106,6 +106,26 @@ export const getMyBookings = async (token) => {
   const payload = await parseJsonOrText(resp);
 
   if (!resp.ok) handleAuthExpired(resp, payload);
+
+  return payload;
+};
+
+export const resolveBarberForBooking = async (place, token) => {
+  const resp = await fetch(API_BASE + "/api/barbers/resolve-place", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(token),
+    },
+    body: JSON.stringify({ place }),
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) {
+    if (resp.status === 401) handleAuthExpired(resp, payload);
+    throw new Error(payload?.msg || payload?.message || "Could not resolve barber place");
+  }
 
   return payload;
 };
@@ -122,7 +142,10 @@ export const createBooking = async (data, token) => {
 
   const payload = await parseJsonOrText(resp);
 
-  if (!resp.ok) handleAuthExpired(resp, payload);
+  if (!resp.ok) {
+    if (resp.status === 401) handleAuthExpired(resp, payload);
+    throw new Error(payload?.msg || payload?.message || "Request failed");
+  }
 
   return payload;
 };
@@ -140,9 +163,6 @@ export const cancelBooking = async (bookingId, token) => {
   return payload;
 };
 
-// --------------------
-// PAYMENT METHODS
-// --------------------
 export const getPaymentMethods = async (token) => {
   const resp = await fetch(API_BASE + "/api/payment-methods", {
     headers: { ...authHeaders(token) },
@@ -207,6 +227,68 @@ export const getNearbyBarbers = async ({ lat, lng, radius = 2000 }) => {
   );
 
   const payload = await parseJsonOrText(resp);
-  if (!resp.ok) throw new Error(payload?.msg || "Failed to load nearby barbers");
-  return payload; // { results: [...] }
+
+  if (!resp.ok) {
+    throw new Error(payload?.msg || "Failed to load nearby barbers");
+  }
+
+  return payload;
+};
+
+export const getConversations = async (token) => {
+  const resp = await fetch(API_BASE + "/api/conversations", {
+    headers: { ...authHeaders(token) },
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) handleAuthExpired(resp, payload);
+
+  return payload;
+};
+
+export const createOrGetConversation = async (userId, token) => {
+  const resp = await fetch(API_BASE + "/api/conversations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(token),
+    },
+    body: JSON.stringify({ user_id: userId }),
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) handleAuthExpired(resp, payload);
+
+  return payload;
+};
+
+export const getConversationMessages = async (conversationId, token) => {
+  const resp = await fetch(API_BASE + `/api/conversations/${conversationId}/messages`, {
+    headers: { ...authHeaders(token) },
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) handleAuthExpired(resp, payload);
+
+  return payload;
+};
+
+export const sendConversationMessage = async (conversationId, text, token) => {
+  const resp = await fetch(API_BASE + `/api/conversations/${conversationId}/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(token),
+    },
+    body: JSON.stringify({ text }),
+  });
+
+  const payload = await parseJsonOrText(resp);
+
+  if (!resp.ok) handleAuthExpired(resp, payload);
+
+  return payload;
 };

@@ -1,6 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import CheckConstraint
+from sqlalchemy import CheckConstraint, UniqueConstraint
 import enum
 
 db = SQLAlchemy()
@@ -34,7 +34,6 @@ class User(db.Model):
 
     created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
 
-    # ✅ RESET PASSWORD (MVP)
     reset_token = db.Column(db.String(255), nullable=True)
     reset_token_expires_at = db.Column(db.DateTime, nullable=True)
 
@@ -51,10 +50,32 @@ class User(db.Model):
         foreign_keys="Booking.client_id",
         cascade="all, delete-orphan",
     )
+
     bookings_as_barber = db.relationship(
         "Booking",
         back_populates="barber",
         foreign_keys="Booking.barber_id",
+        cascade="all, delete-orphan",
+    )
+
+    conversations_as_client = db.relationship(
+        "Conversation",
+        back_populates="client",
+        foreign_keys="Conversation.client_id",
+        cascade="all, delete-orphan",
+    )
+
+    conversations_as_barber = db.relationship(
+        "Conversation",
+        back_populates="barber",
+        foreign_keys="Conversation.barber_id",
+        cascade="all, delete-orphan",
+    )
+
+    sent_messages = db.relationship(
+        "Message",
+        back_populates="sender",
+        foreign_keys="Message.sender_id",
         cascade="all, delete-orphan",
     )
 
@@ -82,10 +103,8 @@ class BarberProfile(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), unique=True, nullable=False, index=True)
 
     bio = db.Column(db.Text, nullable=True)
-
     base_price_cents = db.Column(db.Integer, nullable=True)
     rating = db.Column(db.Float, nullable=True)
-
     borough = db.Column(db.String(50), nullable=True)
     neighborhood = db.Column(db.String(80), nullable=True)
 
@@ -145,7 +164,74 @@ class Booking(db.Model):
         }
 
 
-# ✅ PAYMENT METHODS (CLIENT) - DEMO ONLY (no real card data)
+class Conversation(db.Model):
+    __tablename__ = "conversation"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    client_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    barber_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+    updated_at = db.Column(
+        db.DateTime,
+        server_default=db.func.now(),
+        onupdate=db.func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    client = db.relationship("User", back_populates="conversations_as_client", foreign_keys=[client_id])
+    barber = db.relationship("User", back_populates="conversations_as_barber", foreign_keys=[barber_id])
+
+    messages = db.relationship(
+        "Message",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="Message.created_at.asc()",
+    )
+
+    __table_args__ = (
+        UniqueConstraint("client_id", "barber_id", name="uq_conversation_client_barber"),
+    )
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "client_id": self.client_id,
+            "barber_id": self.barber_id,
+            "created_at": iso_safe(self.created_at),
+            "updated_at": iso_safe(self.updated_at),
+        }
+
+
+class Message(db.Model):
+    __tablename__ = "message"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    conversation_id = db.Column(db.Integer, db.ForeignKey("conversation.id"), nullable=False, index=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+
+    text = db.Column(db.Text, nullable=False)
+
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False, index=True)
+    read_at = db.Column(db.DateTime, nullable=True)
+
+    conversation = db.relationship("Conversation", back_populates="messages")
+    sender = db.relationship("User", back_populates="sent_messages", foreign_keys=[sender_id])
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "conversation_id": self.conversation_id,
+            "sender_id": self.sender_id,
+            "text": self.text,
+            "created_at": iso_safe(self.created_at),
+            "read_at": iso_safe(self.read_at),
+        }
+
+
 class PaymentMethod(db.Model):
     __tablename__ = "payment_method"
 
@@ -153,10 +239,10 @@ class PaymentMethod(db.Model):
 
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
 
-    brand = db.Column(db.String(30), nullable=False)   # Visa / Mastercard / Amex
-    last4 = db.Column(db.String(4), nullable=False)    # 4 digits
-    exp_month = db.Column(db.Integer, nullable=False)  # 1-12
-    exp_year = db.Column(db.Integer, nullable=False)   # 2026, 2027...
+    brand = db.Column(db.String(30), nullable=False)
+    last4 = db.Column(db.String(4), nullable=False)
+    exp_month = db.Column(db.Integer, nullable=False)
+    exp_year = db.Column(db.Integer, nullable=False)
     is_default = db.Column(db.Boolean, nullable=False, default=False, index=True)
 
     created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)

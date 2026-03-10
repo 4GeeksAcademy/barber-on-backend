@@ -17,28 +17,25 @@ import AppointmentNew from "./pages/AppointmentNew";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";   // ✅ NUEVO
-import ResetPassword from "./pages/ResetPassword";     // ✅ NUEVO
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 function isAuthed() {
   return !!localStorage.getItem("token");
 }
 
 function PublicOnly({ children }) {
-  // If you are already logged in, don't allow auth pages
   return isAuthed() ? <Navigate to="/home" replace /> : children;
 }
 
 function PrivateRoute({ children }) {
-  // If you are NOT logged in, send to /login
   return isAuthed() ? children : <Navigate to="/login" replace />;
 }
 
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* ---------------- PUBLIC ROUTES (NO Layout) ---------------- */}
-
+      {/* PUBLIC ROUTES */}
       <Route
         path="/login"
         element={
@@ -57,7 +54,6 @@ export default function AppRoutes() {
         }
       />
 
-      {/* ✅ FORGOT PASSWORD */}
       <Route
         path="/forgot-password"
         element={
@@ -67,7 +63,6 @@ export default function AppRoutes() {
         }
       />
 
-      {/* ✅ RESET PASSWORD */}
       <Route
         path="/reset-password"
         element={
@@ -77,8 +72,7 @@ export default function AppRoutes() {
         }
       />
 
-      {/* ---------------- PROTECTED APP ROUTES (WITH Layout) ---------------- */}
-
+      {/* PROTECTED ROUTES */}
       <Route
         element={
           <PrivateRoute>
@@ -101,8 +95,7 @@ export default function AppRoutes() {
         <Route path="/services-map" element={<ServicesMap />} />
       </Route>
 
-      {/* ---------------- FALLBACK ---------------- */}
-
+      {/* FALLBACK */}
       <Route
         path="*"
         element={<Navigate to={isAuthed() ? "/home" : "/login"} replace />}
